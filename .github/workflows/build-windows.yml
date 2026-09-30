@@ -1,0 +1,50 @@
+name: Build Windows Installer
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Decode source package
+        shell: pwsh
+        run: |
+          certutil -decode windows-runner-source.zip.b64 windows-runner-source.zip
+          Expand-Archive windows-runner-source.zip source
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          cd source
+          pnpm install --frozen-lockfile
+      - name: Run tests
+        shell: pwsh
+        run: |
+          cd source
+          pnpm test
+      - name: Build NSIS installer
+        shell: pwsh
+        run: |
+          cd source
+          pnpm dist:win
+      - name: Prepare installer artifact
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem source/outputs/dist -Filter "*.exe" | Select-Object -First 1
+          if (-not $exe) { throw "No Windows installer .exe was produced" }
+          Copy-Item $exe.FullName "Suno Batch Downloader Setup.exe"
+          Get-Item "Suno Batch Downloader Setup.exe"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Suno Batch Downloader Setup.exe
+          path: Suno Batch Downloader Setup.exe
